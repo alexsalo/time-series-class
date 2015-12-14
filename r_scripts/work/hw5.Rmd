@@ -1,0 +1,419 @@
+---
+title: "Time Series Homework 5"
+author: "Alex Salo"
+date: "December 1, 2015"
+output: pdf_document
+---
+\section{Theoretical Part}
+\textbf{T5.1} A time series  is a harmonic process if:
+$$
+	X_t = \sum_{j=1}^M \{A_j cos (2\pi t \omega_j) + 
+	B_j sin (2\pi t \omega_j) \}, t \in \mathbb{Z},	
+$$
+where, for all $j=1,2,..M:$
+
+1. $E[A_j] = E[B_j] = 0$
+
+2. $Var(A_j) = Var(B_j) = \sigma_j^2$
+
+3. $Cov(A_j, B_j)=0$
+
+4. $\omega_j \in [0, 0.5]$
+
+\textbf{Problems:}
+
+\begin{description}
+\item[(a)] For simplicity, let M = 1. Prove that a harmonic process is second-order stationary.	
+
+To prove that the process is second-order stationary one needs to show two fact about the process to be true:
+
+\begin{enumerate}
+\item $E[X_t] = \mu$, that is mean function is a constant
+\item $Cov(X_s, X_t) = R_{t-s}$, that is the covariance function of any pair of Xs that are the same distance apart in time is the same - in other words that the covariance is the function of lag alone.
+\end{enumerate}
+
+The first fact directly follows from (1) $E[A_j] = E[B_j] = 0$:
+\begin{align}
+E[X_t] &= E[A cos (2\pi t \omega) + B sin (2\pi t \omega)] \\
+&= 0
+\end{align}
+Since 0 is a constant.
+
+\newpage
+To show the second fact true, let $s=t+v$ and let $\phi= 2\pi \omega_j$; let us show that the autocovariance function is the function of the lag only: 
+
+\begin{align}
+R_v &= Cov(X_t, X_{t+v}) \\
+    &= E[(X_t - \mu_{X_t})(X_{t+v} - \mu_{X_{t+v}})] \\
+    &= E[X_t X_{t+v}] - \mu_{X_t} \mu_{X_{t+v}} \\
+    &= E[X_t X_{t+v}] \\
+    &= E[(\sum_{j=1}^M \{A_j cos (\phi t) + B_j sin (\phi t) \})    
+    	 (\sum_{j=1}^M \{A_j cos (\phi t + \phi v) + B_j sin (\phi t + \phi v) \}) ] \\
+    &= E[(A cos (\phi t) + B sin (\phi t))    
+    (A cos (\phi t + \phi v) + B sin (\phi t + \phi v)) ] \\
+    &= E[A^2 cos (\phi t) cos (\phi t + \phi v) + B^2 sin (\phi t) sin (\phi t + \phi v)
+     \\ &+ A B (cos(\phi t) sin (\phi t + \phi v) + sin(\phi t) cos (\phi t + \phi v))] \\  
+    &= E[A^2 cos (\phi t) cos (\phi t + \phi v) + B^2 sin (\phi t) sin (\phi t + \phi v)] \\ 
+    &= \sigma^2 E[cos (\phi t) cos (\phi t + \phi v) + sin (\phi t) sin (\phi t + \phi v)] \\
+    &= \sigma^2 E[ cos(\phi t - \phi t - \phi v) ] \\    
+    &= \sigma^2 E[ cos(- \phi v) ] \\   
+    &= \sigma^2 E[ cos(\phi v) ] \\
+    &= \sigma^2 E[ cos(2\pi v \omega_1)]\\  
+    &= \sigma^2 cos(2\pi v \omega_1) \\   
+\end{align}
+
+To get (9) we used the definition of covariance again: 
+$$ \begin{aligned}
+Cov(X, Y) &= E[XY] - E[X]E[Y] \\
+          &= E[XY] \text{, if }E[X] = 0, E[Y] = 0 
+\end{aligned}$$ 
+Thus giving: $$ E[A_j B_j] = Cov(A_j, B_j) = 0 $$
+
+To get (10) we used the definition of variance:
+$$ \begin{aligned}
+Var(X) &= E[X^2] - (E[X])^2 \\
+       &= E[X^2] \text{, if }E[X] = 0
+\end{aligned}$$
+Thus giving: $$ E[A^2] = E[B^2] = \sigma^2 $$
+
+To get (11) we used the trigonometric identity: $$cos(a - b) = cos(a)cos(b) + sin(a)sin(b)$$
+To get (13) we used the fact that: $$cos(-a) = cos(a)$$
+
+
+\newpage
+\item[(b)]  Letting M = 1 again, is the spectral density function $f(\omega)$ of the harmonic process an absolutely
+continuous function of $\omega$? Hint: What is the condition on $R_v$ for $f(\omega)$ to be absolutely continuous.
+
+From the two-spectral representations theorem we know, that the following must be true in order for $f(\omega)$ to be absolutely continuous:
+$$ \sum_{v=-\infty}^{\infty} |R_v| < \infty $$
+For $M=1$:
+$$ \begin{aligned}
+\sum_{v=-\infty}^{\infty} |R_v| &= \sum_{v=-\infty}^{\infty} |\sigma^2 cos(2 \pi v \omega)| \\
+	&= \sigma^2 \sum_{v=-\infty}^{\infty} |cos(2 \pi v \omega)| \\
+	&= \infty
+\end{aligned}$$
+The sum above is infinite since we sum up non-negative terms, some of them guaranteed to be positive, and we do it infinite number of times, knowing that $\sigma^2>0$.
+Thus the spectral density function $f(\omega)$ of the harmonic process \textbf{is not} an absolutely
+continuous function of $\omega$.
+\end{description}
+
+
+
+\newpage
+\textbf{T5.2} A time series $X$ is a moving average process of order $q$, coefficients $\beta = (\beta_1,...,\beta_q)^T$, and error variance $\sigma^2$ if 
+$$ X_t = \sum_{j=0}^q \beta_j \varepsilon_{t-j} \text{,    } t\in \mathbb{Z}, $$
+where $\beta_0=1$ and $\varepsilon_t \sim  WN(\sigma^2)$. Prove that the autocovariance function $R_v$ of X is
+$$\begin{cases} 
+	\sigma^2 \sum_{j=0}^{q-|v|} \beta_k \beta_{j+|v|} & |v|=0, 1, 2,...,q \\
+	0 & |v|=q+1, q+2,...
+\end{cases}$$
+
+\begin{enumerate}
+\item Consider the definition of the filtered time series:
+$X_t$ is a filtered version of $Y_t$ if we can write it (as a limit in mean square) as a linear function of $Y_t$:
+$$X_t = \sum_{j=-\infty}^{\infty} \beta_j Y_{t-j} \text{,    } t\in \mathbb{Z}, $$
+
+\item Thus, given $X_t = \sum_{j=0}^{q} \beta_j \varepsilon_{t-j}$, we recover that the original time series has a form:
+$$ Y_t = \varepsilon_t \sim WN(\sigma^2)$$
+From earlier exercise, we know that the autocovariance of white noise is zero everywhere, except when lag equals zero:
+$$R_{\varepsilon_t, v} = \sigma^2 \delta_v$$
+
+\item Since $Y_t$ is covariance stationary, then, according to Univariate Filter Theorem (UFT), its filtered version $X_t$ is covariance stationary as well. Furthermore we can express the autocovariance function of $X_t$ as:
+
+\setcounter{equation}{0}
+\begin{align}
+R_{X, v} &= \sum_{k=-\infty}^{\infty} R_{\beta}(k) R_{\varepsilon_t, v-k} \\
+		 &= \sum_{k=-\infty}^{\infty} R_{\beta}(k) \sigma^2 \delta_{v-k} \\
+		 &= \sigma^2 R_{\beta}(v) \\
+		 &= \sigma^2 \sum_{j=-\infty}^{\infty} \beta_j \beta_{j+|v|} \\
+		 &= \sigma^2 \sum_{j=0}^{q} \beta_j \beta_{j+|v|} \\
+		 &= \sigma^2 \sum_{j=0}^{q - |v|} \beta_j \beta_{j+|v|} \\
+		 &=
+		 \begin{cases} 
+		 \sigma^2 \sum_{j=0}^{q-|v|} \beta_j \beta_{j+|v|} & |v|=0, 1, 2,...,q \\
+		 0 & |v|=q+1, q+2,...
+		 \end{cases}
+\end{align}
+
+\begin{description}
+\item[To get (3)] we used the fact that: 
+$$ \begin{aligned}
+R_{\varepsilon_t, v} &= \sigma^2 \delta_v \\
+R_{\varepsilon_t, v-k} &= \sigma^2 \delta_{v-k} \\
+&= \begin{cases} 
+	\sigma^2 & v-k=0 \Rightarrow v=k \\
+	0 & otherwise
+\end{cases}
+\end{aligned}$$ 
+which nullifies the sum everywhere, except when $v=k$ thus leaving only one member. 
+
+\item[To get (5)] we noticed, that the product will be zero when $j < 0$ or $j > q$, since we don't have those coefficients. 
+
+\item[To get (6)]  we noticed, that as soon as $j + |v| > q$ coefficients $\beta_j = 0$, thus we can further reduce the upper border of the summation. 
+
+\item[To get (7)]  we noticed, that the entire sum becomes zero if when lag is larger then the order of MA process ($|v|>q$), since the larger border of the summation becomes less than the lower border $q-|v| < 0$.
+\end{description}
+\end{enumerate}
+
+
+
+
+\newpage
+\textbf{T5.3} Use long division to find the coefficients of an MA(1) representation of an ARMA(1, 1) process having AR coefficient $\alpha$ and MA coefficient $\beta$; that is, divide by $1 + z$ by $1 +z$. Do the division in such
+a way that only nonnegative powers of $z$ are in the answer. What happens for large powers of $z$ if $|\alpha|>1$?
+
+Long polynomial division yields the following:
+\begin{align*}
+& 1 + (\beta - \alpha)z - \alpha (\beta - \alpha)z^2 + \alpha^2 (\beta - \alpha)z^3 
+	- \alpha^3 (\beta - \alpha)z^4 +\ldots\\[-4pt]
+1 + \alpha z \text{ } & \overline{) \text{ } 1+\beta z} \\[-4pt]
+			 & \underline{- 1 - \alpha z} \\[-2pt]
+			 & (\beta - \alpha)z \\[-4pt]
+			-& \underline{(\beta - \alpha)z - \alpha (\beta - \alpha)z^2} \\[-2pt]			 
+			 & \qquad \quad \:\:\:\, -\alpha (\beta - \alpha)z^2 \\[-4pt]
+			 & \qquad \quad \:\:\:\, +\underline{\alpha (\beta - \alpha)z^2 + \alpha^2 (\beta - \alpha)z^3} \\[-2pt]
+			 & \qquad \qquad \qquad \qquad \qquad \quad \:\alpha^2 (\beta - \alpha)z^3 \\[-2pt]	
+			 & \qquad \qquad \qquad \qquad \qquad \qquad \text{(cont.)} \ldots
+\end{align*}
+
+Generalizing the pattern in the result of the division:
+\begin{align*}
+Coef(p) &= 1 + (\beta - \alpha)z - \alpha (\beta - \alpha)z^2 + \alpha^2 (\beta - \alpha)z^3 
+- \alpha^3 (\beta - \alpha)z^4 +...\\
+&= 1 + \beta z - \alpha z - \alpha \beta z^2 + \alpha^2 z^2 + \alpha^2 \beta z^3 - \alpha^3 z^3 + \ldots \\
+&= (1 + \beta z) - (\alpha z + \alpha \beta z^2) + (\alpha^2 z^2 + \alpha^2 \beta z^3) - (\alpha^3 z^3 + \alpha^4 \beta z^4 ) + \ldots\\
+&= (1 + \beta z) - \alpha z (1 + \beta z) + \alpha^2 z^2 (1 + \beta z) - \alpha^3 z^3 (1 + \beta z) + \ldots\\
+&= \sum_{j=0}^{\infty} (-\alpha)^j z^j (1 + \beta z)
+\end{align*}
+
+In the infinite sum derived above all powers of $z$ are nonnegative; if $|\alpha|>1$ then this series diverges. 
+
+For large powers of $z$ and we would have a coefficients that are infinitely large (or small), which would mean invalid MA process. In other words, for $ARMA(1,1,\alpha, \beta)$ we see that if $|\alpha| > 1$ then we would not have an $MA(\infty)$ representation of such a process.
+
+
+
+\newpage
+\section{Computational Part}
+```{r, echo=FALSE}
+source('C:/Dropbox/Baylor/TimeSeries/R/ts_hw/ts_hw/timeslab.R')
+dyn.load('C:/Dropbox/Baylor/TimeSeries/R/ts_hw/ts_hw/timeslab2015_64.dll')
+options(scipen=999) # to disable scientific notation
+```
+
+**C5.1:**
+Use the masp function with Q = 256 frequencies to find the square modulus of the frequency transfer function of the 12-th difference filter. The input to masp will be that of an MA(12) with all coefficients equal to zero, except $\beta_{12} = 1$. Use the plotsp function to plot the natural logarithm of the square modulus (don't forget to compute the variance of the filter). Does the result correspond to what we
+learned about the effect of differencing?
+
+```{r}
+Q = 256
+D = 12
+beta = rep (0, D)
+beta[D] = -1
+sp = masp(beta, Q)
+var = macorr(beta, 1)$var
+var = sum(beta^2)
+plotsp(sp, Q, var)
+```
+
+In the class we learnt that taking the $d^{th}$ difference removes all frequencies of form $\frac{l}{d}, l=0,1 \ldots d$. Since in the example above we have taken $12^{th}$ difference, we expect the following frequencies (consider left side $f \in [0, 0.5]$ only since it's symmetrical): $\{0, 0.08(3), 0.1(6), 0.25, 0.(3), 0.41(6), 0.5\}$ to be removed from the spectrum. Exactly these seven inverted spikes we see on $plotsp$. Interestingly, the rational frequencies that happened to have an exact (terminated) value $\{0, 0.25, 0.5\}$ are going all the way down on the $plotsp$, while others (with repeated decimals) $\{0.08(3), 0.1(6), 0.(3), 0.41(6)\}$ go only half way through. 
+
+\newpage
+
+**C5.2:**
+What four sets of MA(2) parameters (coefficients and error variances) can lead to the autocovariances $R_0 = 1.3125, R_1 = 0.625, R_2 = 0.25$. Which of these sets leads to a characteristic polynomial having all of its zeros outside the unit circle? Which of these sets does function corrma return? Hint: See your notes on the nonidentifability of the moving average process.
+
+1. Find $\sigma^2$ to satisfy autocovariances.
+According to Univariate Filter Theorem (UFT):
+$$ 
+\begin{cases} 
+    R_v = \sigma^2 \sum_{k=0}^{q-|v|} \beta_k \beta_{k+|v|} & |v|=0, 1, 2,...,q \\
+    0 & |v|=q+1, q+2,...
+\end{cases}
+$$
+Which, for MA(2) process, yields the following value for autocovariance function:
+$$
+\begin{aligned}
+  R_0 &= \sigma^2 (\beta_0^2 + \beta_1^2 + \beta_2^2) &= \sigma^2 (1 + \beta_1^2 + \beta_2^2) \\
+  R_1 &= \sigma^2 (\beta_0 \beta_1 + \beta_1 \beta_2) &= \sigma^2 \beta_1^2 (1 + \beta_2)\\
+  R_2 &= \sigma^2 \beta_0 \beta_2     &= \sigma^2 \beta_2 
+\end{aligned}
+$$
+To find parametrs then, we need to solve a system of three equations with three uknowns:
+$$
+\begin{aligned}
+  \sigma^2 (1 + \beta_1^2 + \beta_2^2) &= 1.3125 \\
+  \sigma^2 \beta_1^2 (1 + \beta_2)     &= 0.625\\
+  \sigma^2 \beta_2                     &= 0.25
+\end{aligned}
+$$
+Simplifying, we get one equation:
+$$
+\begin{aligned}
+  \beta_2 &= \frac{1}{4 sigma^2} \\
+  \sigma^2 \beta_1 (1 + \frac{1}{4 \sigma^2}) &= 0.625 \\
+  \beta_1 &= \frac{0.625}{\sigma^2 + 0.25} \\
+  1.3125 &= \sigma^2 (1 + (\frac{0.625}{\sigma^2 + 0.25})^2 + (\frac{0.25}{\sigma^2})^2)
+\end{aligned}
+$$
+Solving this (cubic) equation for $\sigma^2$ in Mathematica:
+$$Solve[x (1 + (0.625/(x + 0.25))^2 + (0.25/x)^2) == 1.3125, x]$$
+Yields the following roots:
+$$
+\begin{aligned}
+  \sigma_1^2 &= 1 \\
+  \sigma_2^2 &= \frac{1}{16} \\
+  \sigma_3^2 &= -\frac{1}{8+i\sqrt{3}} \\
+  \sigma_4^2 &= -\frac{1}{8-i\sqrt{3}} 
+\end{aligned}
+$$
+
+2. Construct the characteristic polynomial and find its zeros.
+Using the finding that $\sigma_1^2 = 1$, we find the first set of coefficients: 
+$$
+\begin{aligned}
+  \beta_1&=0.5 \\
+  \beta_2&=0.25 
+\end{aligned}$$
+For MA(2), characteristic polynomial has the following form:
+$$ 
+\begin{aligned}
+  h(z) &= \sum_{k=0}^{2}\beta_k z^k \\
+       &= 1 + \beta_1 z + \beta_2 z^2 \\
+       &= 1 + 0.5 z + 0.25 z^2
+\end{aligned}
+$$
+Solving this quadratic equation yields:
+$$
+\begin{aligned}
+  z^*_1 &= -1 + i \sqrt(3)\\
+  z^*_2 &= -1 - i \sqrt(3)
+\end{aligned}
+$$
+Thus the roots of the three other charachteristic polynomials are:
+$$
+\begin{aligned}
+  \{z^*_1, \frac{1}{z^*_2}\} &= \{-1 + i \sqrt(3), \frac{1}{-1 - i \sqrt(3)}\} \\ 
+  \{\frac{1}{z^*_1}, z^*_2\} &= \{\frac{1}{-1 + i \sqrt(3)}, -1 - i \sqrt(3)\} \\
+  \{\frac{1}{z^*_1}, \frac{1}{z^*_2}\} &= \{\frac{1}{-1 + i \sqrt(3)}, \frac{1}{-1 - i \sqrt(3)}\}
+\end{aligned}
+$$
+Now we check each pair of roots to find the pair, in which both roots are outside of the unit circle.
+
+```{r}
+z1 = complex(real=-1, imaginary=sqrt(3))
+z2 = complex(real=-1, imaginary=-sqrt(3))
+
+Mod(z1) 
+Mod(z2)
+Mod(1/z1) 
+Mod(1/z2)
+```
+Thus we choose the pair $\{-1 + i \sqrt(3), -1 - i \sqrt(3)\}$, which, as we already seen, relates to the coefficients $beta_1=0.5, \beta_2=0.25$ and variance $\sigma^2=1$.
+
+3. Using *corrma* function:
+```{r}
+#corrma() is under construction
+```
+
+
+\newpage
+
+**C5.3:**
+If X is an AR(1) process with $\alpha = 0.05$, write $X_t$ as a function of $X_{t-2}$ and some $\varepsilon$'s and of $X_{t+2}$ and some $\varepsilon$'s.
+
+1. AR(p) has the form:
+$$X_t + \alpha_1 X_{t-1} + ... + \alpha_pX_{t-p} = \varepsilon_t$$
+Thus AR(1) has the form:
+$$
+\begin{aligned}
+  X_t + \alpha X_{t-1} &= \varepsilon_t \\
+  X_t &= - \alpha X_{t-1} + \varepsilon_t \\
+  X_t &= - \alpha (- \alpha X_{t-2} + \varepsilon_{t-1}) + \varepsilon_t \\
+  X_t &= -0.05 (-0.05 X_{t-2} + \varepsilon_{t-1}) + \varepsilon_t \\
+  X_t &= 0.0025 X_{t-2} - 0.05 \varepsilon_{t-1} + \varepsilon_t 
+\end{aligned}
+$$
+Another approach is as follows:
+$$
+\begin{aligned}
+  X_t + \alpha X_{t-1} &= \varepsilon_t \\
+  X_{t+1} + \alpha X_t &= \varepsilon_{t+1} \\
+  \frac{1}{\alpha} X_{t+1} + X_{t} &= \frac{1}{\alpha} \varepsilon_{t+1} \\
+  X_{t} &= -\frac{1}{\alpha} (X_{t+1} - \varepsilon_{t+1}) \\
+  X_{t} &= -\frac{1}{\alpha} (-\frac{1}{\alpha} (X_{t+2} - \varepsilon_{t+2}) - \varepsilon_{t+1}) \\
+  X_{t} &= (\frac{1}{\alpha})^2 X_{t+2} - (\frac{1}{\alpha})^2 \varepsilon_{t+2} + \frac{1}{\alpha} \varepsilon_{t+1} \\
+  X_{t} &= 400 X_{t+2} - 400 \varepsilon_{t+2} + 20 \varepsilon_{t+1}
+\end{aligned}
+$$
+
+\newpage
+
+**C5.4:**
+Which of the following sets of coefficients can be regarded as the coefficients of an AR process?
+
+In order to use Yule-Walker equations (and satisfy the theorem about the relationship between MA and AR processes), we require the roots of the characteristic polynomial (constructed using coefficients $\alpha$) to be outside of the unit circle. 
+
+
+1. $\alpha=(-0.9, 0.8)$
+The process has the following form:
+$$ X_t -0.9 X_{t-1} + 0.8 X_{t-2} = \varepsilon_t $$
+Then the characteristic polynomial is:
+$$\sum_{j=0}^{2} \alpha_j z^j = 1 - 0.9z +0.8z^2$$
+Finding roots of the quadratic equation $8z^2 - 9z + 10 = 0$:
+$$ 
+\begin{aligned}
+  D &= b^2 - 4ac = 81 - 320 = -239 \\
+  x_{1,2} &= \frac{-b \pm \sqrt{D}}{2a} = \frac{9 \pm \sqrt{-239}}{16} \\
+  x_1 &= \frac{9}{16} + i \frac{\sqrt{239}}{16} \\
+  x_2 &= \frac{9}{16} - i \frac{\sqrt{239}}{16}
+\end{aligned}
+$$
+Now check whether or not they are outside of the unit circle:
+```{r}
+z1 = complex(real=9/16, imaginary=sqrt(239)/16)
+z2 = complex(real=9/16, imaginary=-sqrt(239)/16)
+
+Mod(z1); Mod(z2)
+```
+We see that they are outside of the unit circle, meaning that the set of coefficients can be regarded as the coefficients of an AR process.
+Alternatively, we can avoid doing the work by hand and use R function to answer the question:
+```{r}
+polyrt <- function(coef){return(polyroot(c(1, coef)))}
+
+isValidAR <- function(alpha) {
+  roots = Mod(polyrt(c(alpha)))
+  print(roots)
+  if ((roots[1] > 1) && (roots[2] > 1))
+    print("Yes, valid set of coefficients for AR process")
+  else
+    print("No, one or more roots are not outside of the unit circle")
+}
+
+alpha = c(-0.9, 0.8)
+isValidAR(alpha)
+```
+Which produces the same result, confirming that this set of coefficient can be regarde as the coefficients of an AR process.
+
+2. $\alpha=(-1.54, 0.4)$
+```{r}
+alpha=c(-1.54, 0.4)
+isValidAR(alpha)
+```
+
+3. $\alpha=(1, -0.904, -0.7)$
+```{r}
+alpha=c(1, -0.904, -0.7)
+isValidAR(alpha)
+```
+
+4. $\alpha=(-1.22, 1.16, -0.7)$
+```{r}
+alpha=c(-1.22, 1.16, -0.7)
+isValidAR(alpha)
+```
+
+5. $\alpha=(-0.09, -1.5884, -0.024, 0.9)$
+```{r}
+alpha=c(-0.09, -1.5884, -0.024, 0.9)
+isValidAR(alpha)
+```

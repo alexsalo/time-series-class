@@ -1,0 +1,820 @@
+---
+title: "Time Series Final Exam"
+author: "Alex Salo"
+date: "December 9, 2015"
+output: pdf_document
+---
+```{r, echo=FALSE}
+source('C:/Dropbox/Baylor/TimeSeries/R/ts_hw/ts_hw/timeslab2015.R')
+source('C:/Dropbox/Baylor/TimeSeries/R/ts_hw/ts_hw/arestsim.R')
+source('C:/Dropbox/Baylor/TimeSeries/R/ts_hw/ts_hw/armaestsim.R')
+dyn.load('C:/Dropbox/Baylor/TimeSeries/R/ts_hw/ts_hw/timeslab2015_64.dll')
+options(scipen=999) # to disable scientific notation
+```
+
+\section{1. Investigating Estimators of the Coefficients of an AR(p) process}
+Let us simulate 500 realizations of AR(3) process $X_t - 0.3X_{t-1} + 0.8X_{t-3} = \varepsilon_t$ and try to estimate the coefficients using four different methods while using 50, 100, 250 or 500 of the generated realizations:
+```{r}
+rvar = 1                 # variance of white noise
+nreps = 500              # number of generated realizations of the process in simulation
+n = c(50, 100, 250, 500) # number of realizations actually used in simulation
+alpha = c(-0.3, 0, 0.8)  # coefficients of AR(3) process
+# arsim = ar_est(alpha=alpha, rvar=rvar, nreps=nreps, seed=0)
+arsim = readRDS("arsim.rds")
+```
+
+
+\subsection{A. Numerical Description of the estimates}
+Let us make a summary statistics for each n for each coefficient for each estimate using summary function in R:
+
+```{r}
+estimate_names = vector()
+AR_est_names = c("YW", "OLS", "MLE", "Burg")
+for (name in AR_est_names)
+  for (num in n)
+    estimate_names = c(estimate_names, paste(name, num, sep='_'))
+  
+sum_names = names(summary(arsim$yw.est[1,4,]))
+summary_table = array(0, dim = c(length(estimate_names), 6, length(alpha)), 
+                      dimnames=list(estimate_names,       # estimate method
+                                    sum_names,            # summary headers
+                                    c('a1', 'a2', 'a3'))) # coefficients
+for (i in 1:length(n))
+  for (name in AR_est_names)
+    for (coef in 1:length(alpha)) {
+      est_name = paste(name, n[i], sep='_')               # ~YW_50
+      arsim_name = paste(tolower(name),'est', sep='.')    # ~arsim$yw.est
+      summary_table[est_name, ,coef] = unname(summary(arsim[[arsim_name]][coef,i,]))
+    }
+summary_table
+```
+In fact, the desirable information is in 4d array, but since humans can only perceive 2d tables, we condense one dimension (increase of n) into additional rows (while marking as est_n), and print three tables for each coefficient separately since we don't really need to compare the stats between the coefficients. 
+
+It appears that each estimator makes a very reasonable estimates of the $\alpha_1, \alpha_2, \alpha_3$; also there seem to be no significant difference between the estimators, except for $\alpha_2$, where Yuler-Walker estimate significantly under-performs other three estimates. For example, in case of $n==500$ we see that:
+\begin{enumerate}
+\item Yuler-Walker gives a mean and median estimates that are worse than MLE and Burg by the entire order (time ten, or extra zero in accuracy). 
+\item OLS seems to be twice worse than MLE and Burg.
+\end{enumerate}
+That observation seems to be present only in case of $\alpha_2 = 0$, which suggest that YW maybe has some problems with this extreme value. 
+
+\subsection{B. Histograms}
+Let us make a function to produce the histograms of $\alpha_a$ estimations for increasing number of considered realizations for a given $a$ and estimation method: 
+```{r}
+plot_hists = function(a, xlim, ylim, main, est_data) {
+  par(mfrow=c(2,2), mar = c(2,4,1.5,0.5) + 0.1)
+  for (num in 1:length(n)) {
+    data = est_data[a,num,]
+    tmp = hist(data, probability = TRUE, main=paste("n =", n[num]),
+         xlim=xlim, ylim=ylim,
+         xlab = expression(paste("Estimation of ", alpha)))
+    abline(v=alpha[a], col='Red', lwd=2)
+    data_mean = mean(data); data_std = sd(data)
+    abline(v=data_mean, col='Blue', lwd=2)
+    abline(v=c(data_mean-data_std, data_mean+data_std), col='Grey', lwd=2, lty=2)
+  }
+  title(paste(main, "Estimator"), line = -1, outer = TRUE)
+}
+```
+
+Now we can see what each of the four different estimation methods produce for $alpha_2$. Note the following about the plots:
+\begin{enumerate}
+  \item Red line shows true value of $\alpha_2$, which is 0.
+  \item Blue line shows the mean value of $\hat{\alpha}_a$ across all replications.
+  \item Grey lines shows $\pm$ one standard error of $\hat{\alpha}_a$
+\end{enumerate}
+```{r}
+# coef alpha_2
+a = 2
+
+# min\max accross all estimators and all realizations for given coef
+xlim = c(min(summary_table[,,a]), max(summary_table[,,a]))
+
+# from zero to the max height of the best estimator at max n
+ylim = c(0, max(hist(arsim$mle.est[a,4,], plot=FALSE)$density))
+```
+
+```{r, fig.height = 4}
+plot_hists(a, xlim, ylim, main="Yuler-Walker", est_data=arsim$yw.est)
+plot_hists(a, xlim, ylim, main="OLS", est_data=arsim$ols.est)
+plot_hists(a, xlim, ylim, main="MLE", est_data=arsim$mle.est)
+plot_hists(a, xlim, ylim, main="Burg", est_data=arsim$burg.est)
+```
+
+\subsection{C. Boxplots}
+Let us also make a function to plot boxplots for each estimator and increasing number of considered realizations for a given $a$:
+```{r}
+plot_boxplots = function(a) {
+  par(mfrow=c(2,2), mar = c(2,4,1.5,0.5) + 0.1)
+  for (num in 1:length(n)) {
+    boxplot(arsim$yw.est[a,num,], arsim$ols.est[a,num,],
+            arsim$mle.est[a,num,], arsim$burg.est[a,num,],
+            names=AR_est_names, col="gold", 
+            main=paste("n =", n[num]), pars=list(ylim=c(-0.25,0.6)))
+    title(bquote(hat(alpha[.(a)])), line=-1)
+  }
+}
+```
+
+Which for $\hat{\alpha}_2$ gives:
+```{r, fig.height = 5.5}
+plot_boxplots(a=2)
+```
+
+\subsection{D. Another Graphical Summaries}
+Consider Violin plots which is just combination of a boxplot and kernel density plot.
+```{r, include=FALSE}
+require(vioplot)
+```
+```{r, fig.height = 5.5}
+# library(vioplot)
+plot_violins = function(a) {
+  par(mfrow=c(2,2), mar = c(2,4,1.5,0.5) + 0.1)
+  for (num in 1:length(n)) {
+    vioplot(arsim$yw.est[a,num,], arsim$ols.est[a,num,],
+            arsim$mle.est[a,num,], arsim$burg.est[a,num,],
+            names=c("YW", "OLS", "MLE", "Burg"), col="gold",
+            ylim=c(-0.2,0.5))
+    title(paste("n =", n[num]))
+  }
+  title(main=paste("Estimates of a =", a), line = -1, cex=5, outer = TRUE)
+}
+plot_violins(a=2)
+```
+On this plots we can see the information from both previous methods (histograms and boxplots), to some extent, while using only half of the space.
+
+Another thing we can do is to extend the summary table that we calculated. It feels awkward to try manually look into the table for various anomalies and discrepancies; to streamline the process we can plot the mean of the estimates of the coefficients as a function of the number of realizations considered: 
+```{r, include=FALSE}
+# plot convergence of estimates for one alpha
+plot_est_converge = function(a) {
+  coef = paste('a', a, sep='')
+  ylim = c(min(alpha[a] - 0.05, min(summary_table[, 'Mean', coef])), 
+           max(alpha[a] + 0.05, max(summary_table[, 'Mean', coef])))
+  plot(n, summary_table[1:4, 'Mean', coef], type='o', col="Blue", ylim=ylim, xlab="")
+  lines(n, summary_table[5:8, 'Mean', coef], type='o', col="Purple")
+  lines(n, summary_table[9:12, 'Mean', coef], type='o', col="Green")
+  lines(n, summary_table[13:16, 'Mean', coef], type='o', col="Gold")
+  abline(h=alpha[a], col="Red")
+  mtext(text="n", line=2, side = 1)
+  title(bquote(hat(alpha[.(a)])), line=-1)
+  legend('topright', legend=c(AR_est_names, expression(alpha)), lty=c(1,1,1),
+         lwd=c(2.5,2.5,2.5),col=c("Blue","Purple","Green", "Gold", "red"))
+}
+# make plots for each alpha
+plot_converge_estimators = function() {
+  par(mfrow=c(1,3), mar = c(4,2,3,0.5) + 0.1)
+  for (a in 1:length(alpha))
+    plot_est_converge(a)
+  title('Estimating coefficients of AR using YW, OLS, MLE and Burg', line=-2, outer=TRUE)
+}
+```
+```{r}
+plot_converge_estimators()
+```
+Here we can make a several additional observations:
+\begin{enumerate}
+  \item Yuler-Walker estimator seemingly significantly underperforms other three estimators.
+  \item Those other three (OLS, MLE and Burg) produce very similar results.
+  \item Ultimately every estimator seem to be converging to the true value.
+  \item YW, OLS and MLE, as we observe in our small sample, only approach the true value from one side and do not oscillate back and forth around the true value. If that observation is a true fact, it would be a significant one since we could put tight \textbf{guarantees} on the true values.
+\end{enumerate}
+
+Below is the code listing to produce the plots above:
+```{r}
+# plot convergence of estimates for one alpha
+plot_est_converge = function(a) {
+  coef = paste('a', a, sep='')
+  ylim = c(min(alpha[a] - 0.05, min(summary_table[, 'Mean', coef])), 
+           max(alpha[a] + 0.05, max(summary_table[, 'Mean', coef])))
+  plot(n, summary_table[1:4, 'Mean', coef], type='o', col="Blue", ylim=ylim, xlab="")
+  lines(n, summary_table[5:8, 'Mean', coef], type='o', col="Purple")
+  lines(n, summary_table[9:12, 'Mean', coef], type='o', col="Green")
+  lines(n, summary_table[13:16, 'Mean', coef], type='o', col="Gold")
+  abline(h=alpha[a], col="Red")
+  mtext(text="n", line=2, side = 1)
+  title(bquote(hat(alpha[.(a)])), line=-1)
+  legend('topright', legend=c(AR_est_names, expression(alpha)), lty=c(1,1,1),
+         lwd=c(2.5,2.5,2.5),col=c("Blue","Purple","Green", "Gold", "red"))
+}
+# make plots for each alpha
+plot_converge_estimators = function() {
+  par(mfrow=c(1,3), mar = c(4,2,3,0.5) + 0.1)
+  for (a in 1:length(alpha))
+    plot_est_converge(a)
+  title('Estimating coefficients of AR using YW, OLS, MLE and Burg', line=-2, outer=TRUE)
+}
+```
+
+\subsection{Summary of the Analysis}
+\begin{enumerate}
+\item Sampling distributions of the estimators appear to have a bell-shaped and look "normal". Tails appear to shrink with the increase of $n$ (number of realizations considered) while the density around the mean values increases making the estimate more rigid (accurate) with less deviation. 
+
+\item Bias in estimators
+\begin{enumerate}
+  \item Yuler-Walker estimator appears to be biased since the estimation (with the small n) is far from the true value. However, increasing series length appear to shrink the bias and at $n=500$ the estimation is very close to the true value. On the boxplots, YW estimator stays above the other three at $n=50$, but then eventually comes close (at the same level) with them. 
+  \item OLS, MLE and Burg estimators appear to be unbiased (even with small $n=50$). These estimators too, however, decrease their bias (distance to the true value of the parameter $\alpha_2$) with the increase of $n$, which is nice feature of estimators to have. 
+\end{enumerate}
+
+\item For every estimator, increasing $n$ reduces the standard error - i.e. the estimation becomes more precise when we see more realizations of the process. 
+
+\item To summarize, estimators of AR process do a good job in estimating the true parameters of the process based on its observed realizations. The realizations we observe - the better the estimations are, which is very desirable. YW appears to be biased, while MLE, OLS and Burg to be not. With the increase of $n$, however, they all seem to converge to the true parameters' values. Standard error shrinks with the increase of $n$ too. Thus all the evidence suggest that the more realizations we observe, the better we can describe the AR process.
+
+\item I would probably choose MLE or Burn estimators for a real application, since they appear to be less biased and give better and consistent results even with smaller $n$. 
+\end{enumerate}
+
+
+\newpage
+\section{2. Investigating Estimators of the coefficients of an MA(q) Process}
+Let us simulate 500 realizations of MA(3) process $X_t = \varepsilon_t - 0.3X_{t-1} + 0.8X_{t-3}$ and try to estimate the coefficients using either Maximum Likelihood (MLE) or Conditional Sums of Squares (CSS) estimator, while using 50, 100, 250 or 500 of the generated realizations:
+```{r}
+rvar = 1                 # variance of white noise
+nreps = 500              # number of generated realizations of the process in simulation
+n = c(50, 100, 250, 500) # number of realizations actually used in simulation
+beta = c(-0.3, 0, 0.8)   # coefficients of MA(3) process
+# masim = arma_est(alpha=0, beta=beta, rvar=rvar, nreps=nreps, seed=0)
+masim = readRDS("masim.rds")
+```
+
+\subsection{A. Numerical Description of the estimates}
+Let us make a summary statistics for each n for each coefficient for each estimate using summary function in R:
+
+```{r}
+estimate_names = vector()
+MA_est_names = c("MLE", "CSS")
+for (name in MA_est_names)
+  for (num in n)
+    estimate_names = c(estimate_names, paste(name, num, sep='_'))
+  
+sum_names = names(summary(masim$mle.est[1,4,]))
+summary_table = array(0, dim = c(length(estimate_names), 6, length(alpha)), 
+                      dimnames=list(estimate_names,       # estimate method
+                                    sum_names,            # summary headers
+                                    c('a1', 'a2', 'a3'))) # coefficients
+for (i in 1:length(n))
+  for (name in MA_est_names)
+    for (coef in 1:length(alpha)) {
+      est_name = paste(name, n[i], sep='_')               # ~CSS_50
+      masim_name = paste(tolower(name),'est', sep='.')    # ~masim$css.est
+      summary_table[est_name, ,coef] = unname(summary(masim[[masim_name]][coef,i,]))
+    }
+summary_table
+```
+Looking at the summary stats table we can observe that while both methods estimate the true value of the coefficients well, on the $\alpha_2=0, n=500$ MLE outperforms CSS by the factor of ten in how close it is to the true value; this factors widens with the increase of $n$.
+
+
+\subsection{B. Histograms}
+Using the plot function from the AR section, we produce the histograms of $\beta_a$ estimations for increasing number of considered realizations for a given $a$ and estimation method. We observe the following:
+\begin{enumerate}
+  \item Distributions seem to have a "normal" shape.
+  \item Standard Errors shrink with the increase of $n$.
+  \item Both estimator appear to work well and be unbiased - with the increase of n the estimate seems to approach the true value of the parameter.  
+  \item MLE seems to estimate marginally better than CSS and seem to converge faster. 
+\end{enumerate}
+
+```{r}
+a = 2
+xlim = c(min(summary_table[,,a]), max(summary_table[,,a]))
+ylim = c(0, max(hist(masim$mle.est[a,4,], plot=FALSE)$density))
+```
+
+\newpage
+```{r, fig.height = 4}
+plot_hists(a, xlim, ylim, main="MLE", est_data=masim$mle.est)
+plot_hists(a, xlim, ylim, main="CSS", est_data=masim$css.est)
+```
+
+\subsection{C. Boxplots}
+By slightly adjusting the boxplot function from AR section, we are able to plot boxplots for each estimator and increasing number of considered realizations for a given $a$:
+```{r, fig.height = 5.5}
+plot_boxplots_ma = function(a) {
+  par(mfrow=c(2,2), mar = c(2,4,1.5,0.5) + 0.1)
+  for (num in 1:length(n)) {
+    boxplot(masim$mle.est[a,num,], masim$css.est[a,num,],
+            names=MA_est_names, col="gold", 
+            main=paste("n =", n[num]), pars=list(ylim=c(-0.3,0.5)))
+    title(bquote(hat(beta[.(a)])), line=-1)
+  }
+}
+plot_boxplots_ma(a=2)
+```
+Which for $\hat{\beta}_2$ shows once more that MLE works slightly better.
+
+
+
+\subsection{D. Line plot of summary tables}
+Slightly adjusting the function from AR section we get the following imagery:
+```{r}
+plot_est_converge_ma = function(a) {
+  coef = paste('a', a, sep='')
+  ylim = c(min(alpha[a] - 0.05, min(summary_table[, 'Mean', coef])), 
+           max(alpha[a] + 0.05, max(summary_table[, 'Mean', coef])))
+  plot(n, summary_table[1:4, 'Mean', coef], type='o', col="Blue", ylim=ylim, xlab="")
+  lines(n, summary_table[5:8, 'Mean', coef], type='o', col="Green")
+  abline(h=alpha[a], col="Red")
+  mtext(text="n", line=2, side = 1)
+  title(bquote(hat(alpha[.(a)])), line=-1)
+  legend('topright', legend=c(MA_est_names, expression(alpha)), lty=c(1,1,1),
+         lwd=c(2.5,2.5,2.5),col=c("Blue","Green", "Red"))
+}
+plot_converge_estimators_ma = function() {
+  par(mfrow=c(1,3), mar = c(4,2,3,0.5) + 0.1)
+  for (a in 1:length(alpha))
+    plot_est_converge_ma(a)
+  title('Estimating coefficient of MA using MLE and CSS', line=-2, outer=TRUE)
+}
+plot_converge_estimators_ma()
+```
+Observations:
+\begin{enumerate}
+  \item MLE estimator seemingly significantly underperforms CSS.
+  \item MLE seems to overestimate at the beginning (small n) which causes it to oscillate about true value of the parameter; it's hard to notice, but it seems that in case of $\alpha_1, \alpha_2$ MLE actually goes further from the true value on $n=500$ than on the previous point at $n=250$ which is not a good sign, in general, yet it is still very close to the true value (closer than CSS anyway).  
+  \item CSS, as oppose to MLE, in our small observation sample, only approach the true value from one side and do not oscillate back and forth around the true value. If that observation is a true fact, allowing one to put tight guarantees on the true values, it could outweigh the benefit of faster convergence of MLE.
+\end{enumerate}
+
+This difference in approaching from one side slowly vs. converging faster by overestimating (thus oscillating), if true, is a very important one; it would dictate the method of choice for the concrete real life problem. 
+
+That situation seems similar to the problem of Logistic Regression in Machine Learning, where one is to choose between Gradient Descent or Newton Method. Gradient descent works much slower but guarantees the results, while Newton methods works amazingly fast but has some problems on specific datasets since it calculates the Hessian Matrix, which is basically the second partial derivative. $\footnote{For more details refer to the chapter 3 of this work: \url{http://www.alexsalo.xyz/papers/investigations/machine-learning/mle_wlr_gradient-descent_newthon.pdf}}$
+
+
+\subsection{Summary of the Analysis}
+\begin{enumerate}
+\item Sampling distributions appears to have "normal shape".
+\item Both estimators appear to be unbiased; both converge to the true value of the parameters, but the MLE does so faster than CSS.
+\item Increase of $n$ reduces the standard error for both estimators. 
+\item To summarize, MLE outperforms (converges faster) CSS in estimation the true value of the parameter, yet both appear to be unbiased and work well. 
+\item I would probably choose MLE since it appears to converge faster and in real life we don't generally have many observations of the time series. 
+\end{enumerate}
+
+
+\newpage
+\section{3. Data Analysis}
+```{r, include=FALSE}
+ts1 = read.table('C:/Dropbox/Baylor/TimeSeries/R/ts_hw/series1.dat')$V1
+ts2 = read.table('C:/Dropbox/Baylor/TimeSeries/R/ts_hw/series2.dat')$V1
+ts3 = read.table('C:/Dropbox/Baylor/TimeSeries/R/ts_hw/series3.dat')$V1
+ts4 = read.table('C:/Dropbox/Baylor/TimeSeries/R/ts_hw/series4.dat')$V1
+ts5 = read.table('C:/Dropbox/Baylor/TimeSeries/R/ts_hw/series5.dat')$V1
+ts6 = read.table('C:/Dropbox/Baylor/TimeSeries/R/ts_hw/series6.dat')$V1
+ts7 = read.table('C:/Dropbox/Baylor/TimeSeries/R/ts_hw/series7.dat')$V1
+ts8 = read.table('C:/Dropbox/Baylor/TimeSeries/R/ts_hw/series8.dat')$V1
+
+library(forecast)
+
+descplot2 <- function(x, m, alpha = 0.05)
+  #-----------------------------------------------------------------------
+#  R function to create plots of univariate descriptive statistics.
+#
+#  INPUT: x = a real vector containing the time series
+#         m = an integer scalar indicating the number of lags for
+#             computing the sample autocorrelation function, sample
+#             partial autocorrelation functions, and standardized
+#             residual variances.
+#         alpha = a real scalar between 0 and 0.2 indicating the level
+#                 of significance for white noise tests.
+#  VALUE: The function descplot creates plots of univariate descriptive
+#         statistics of the time series in x.
+#-----------------------------------------------------------------------
+{
+  if(m < 5) stop("\n The value of m must be greater than 5.\n")
+  if(alpha < 0 || alpha > 0.20)
+    stop("\nThe value of alpha must be between 0 and 0.2.\n")
+  
+  z <- describe(x, m)
+  n <- length(x)
+  
+  par(mfrow = c(3, 2), oma = rep(0, length = 4), mar = c(4, 4, 1, 2) + 0.1)
+  plot(x, type = "l", xlab = "t", ylab = expression(x[t]), 
+       main = "Time Plot")
+  plot(z$corr, ylim = c(-1,1), type = "l",
+       xlab = "v", ylab = expression(hat(rho[v])), 
+       main = "Correlogram")
+  lim <- qnorm((1+(1-alpha)^(1/m))/2)/sqrt(n)
+  lines(c(0, m), c(lim, lim), lty = 2)
+  lines(c(0, m), c(-lim, -lim), lty = 2)
+  lines(c(0, m), c(0, 0))
+  #
+  plot(z$part, ylim = c(-1, 1), type = "l",
+       main = "Partial Correlogram",
+       xlab = "v", ylab = expression(hat(theta[v])))
+  lines(c(0, m), c(0, 0))
+  #
+  plot(z$srvar, ylim = c(0, 1), pch = 20,
+       main ="Standardized Residual Variances",
+       xlab = "v", ylab = expression(hat(sigma^2)[v]))
+  
+  #plot(freqs(n), log(stdf(z$per, tsvar(x), exp(-6), exp(6))),
+  #     type = "l", xlab = expression(omega), ylab = "", ylim = c(-6, 6),
+  #     main="Natural Log of Std Periodogram")
+  
+  M = ceiling(4*n^(1/5)/3)
+  if (M/n < 0.05) {
+    M = ceiling(0.05*n)
+  }else if (M/n > 0.1) {
+    M = floor(0.1*n)
+  }
+  rho = corr(x, M)
+  fhat = windowf(rho=rho$corr, R0=tsvar(x), Q=n, ioptw=4, M=M, n=n)$f
+  plot(freqs(n), log(stdf(fhat, tsvar(x), exp(-6), exp(6))),
+       type = "l", xlab = expression(omega), ylab = "", ylim = c(-6, 6),
+       main="Natural Log of Std Smoothed Periodogram")
+  
+
+  
+  plot(freqs(n), z$cper, ylim = c(0, 1), type = "l",
+       xlab = expression(omega), ylab = expression(hat(F)*(omega)),
+       main = "Cumulative Periodogram")
+  #
+  fb <- rep(0, length = 501)
+  b  <- seq(0.4, 2, length = 501)
+  for(i in 1:501) fb[i] <- 1 - barttest(b[i], n)$pval
+  inds <- which(round(fb, 3) == round(1 - alpha, 3))
+  if(length(inds) == 1) cc <- b[inds] else cc <- median(b[inds])
+  xx <- seq(0, 0.5, length = n)
+  yy.upper <- 2*xx + cc/sqrt(length(z$cper))
+  yy.lower <- 2*xx - cc/sqrt(length(z$cper))
+  
+  lines(c(0, 0.5), c(0, 1))
+  lines(xx, yy.upper, lty = 2)
+  lines(xx, yy.lower, lty = 2)
+  #
+  return(invisible())
+}
+```
+
+\subsection{Descplot with smoothed spectrum estimate}
+Let us modify the Timeslab's $descplot$ function to plot the natural logarithm of the standardized \textbf{smoothed periodogram} instead of "raw" periodogram.
+```{r, eval=FALSE}
+descplot2 <- function(x, m, alpha = 0.05)
+  ...
+  # Natural log of Standartized Periodogram
+  # Original 
+  # plot(freqs(n), log(stdf(z$per, tsvar(x), exp(-6), exp(6))),
+  #     type = "l", xlab = expression(omega), ylab = "", ylim = c(-6, 6),
+  #     main="Natural Log of Standardized Periodogram")
+  
+  # Smoothed version
+  M = ceiling(4*n^(1/5)/3) # Parzen's suggested optimal value
+                           # If (M/n) outside of [0.05, 0.1] range
+  if (M/n < 0.05) {        # Ceiling to the nearest int s.t. M/n > 0.05  
+    M = ceiling(0.05*n)
+  }else if (M/n > 0.1) {   # Floor to the nearest int s.t. M/n < 0.1  
+    M = floor(0.1*n)
+  }
+  rho = corr(x, M)
+  
+  # Smooth with Parzen window of width M
+  fhat = windowf(rho=rho$corr, R0=tsvar(x), Q=n, ioptw=4, M=M, n=n)$f
+  plot(freqs(n), log(stdf(fhat, tsvar(x), exp(-6), exp(6))),
+       type = "l", xlab = expression(omega), ylab = "", ylim = c(-6, 6),
+       main="Natural Log of Standardized Smoothed Periodogram")
+  ...
+}
+```
+
+Now we can try to make an educated guess at what process generated given realizations.
+
+\newpage
+\subsection{Time Series 1}
+```{r, fig.height=6.5}
+descplot2(ts1, m=30)
+```
+TS1 appears to be generated by a \textbf{white noise process} since correlogram and periodograms stay within the white noise boundaries. To estimate process variance, let us use Timeslab's sample autocorrelation function (acf), which outputs the variance estimation if no $m$ is specified:
+```{r}
+corr(ts1)
+```
+Thus we can guess that the process generated TS2 is $X^1_t = WN(\sigma^2=1.05)$
+
+
+\newpage
+\subsection{Time Series 2}
+```{r, fig.height=6.5}
+descplot2(ts2, m=30)
+```
+TS2 appears to be generated by a \textbf{random walk process} judging by the signature $F(\omega)$ plot (goes up almost as a straight line, then curves fast, then stays close to 1)  and zero-after-first-lag PACF. Besides, the time plot looks like a stock market which the way RW plots usually look. 
+
+To check our guess, let's take the first difference and make a descplot:
+```{r, fig.height=5.5}
+descplot2(diff(ts2, 1), m=30)
+```
+From theory we know that taking first difference converts the random walk process back into white noise process, since RW was made by doing the reverse in the first place:
+$$
+\begin{aligned}
+X_t = X_{t-1} + \varepsilon_t \\
+X_t - X_{t-1} = \varepsilon_t
+\end{aligned}
+$$
+
+By looking at the descplot we can confirm that taking the first difference transformed the TS back into white noise (since both correlogram and cumulative periodogram are withing the white noise boundaries). 
+```{r}
+corr(diff(ts2, 1))
+```
+Thus we can guess that the process generated TS2 is $X^2_t = RW(\sigma^2=0.93)$
+
+
+\newpage
+\subsection{Time Series 3}
+```{r, fig.height=4.5}
+descplot2(ts3, m=30)
+```
+TS3 appears to be generated by a \textbf{harmonic process} since the correlogram looks like a sinusoid and cumulative periodogram has distinct "jumps". Since we see two such distinct jumps we can guess that harmonic consists of two sinusoids. To determine the frequency components and estimate the corresponding amplitudes, we use the sinusoidal decomposition theorem and the formula of natural frequencies $\omega_n = \frac{(k - 1)}{n}$.
+```{r}
+n = length(ts3)
+# Decompose TS into frequency domain via FFT
+ts3.freqs = round(Mod(fft(ts3))[1:(n/2+1)] * 2 / n, 6)
+
+# Weed out small values which are likely due to the noise
+ts3.freqs[ts3.freqs < 1] = 0     
+
+n / (-1 + which(ts3.freqs > 0))  # Find frequencies
+ts3.freqs[ts3.freqs > 0]         # Find amplitudes
+
+```
+Thus we can guess that the process generated TS3 is $X^3_t = 1.2 cos \frac{2 \pi (t-1)}{80} + 3.7 cos \frac{2 \pi (t-1)}{12}$
+
+
+
+\newpage
+\subsection{Time Series 4}
+```{r, fig.height=4}
+descplot2(ts4, m=30)
+```
+TS4 appears to be generated by a \textbf{harmonic process} since it looks very similar to the TS3. However, on TS4 descplot's cumulative preiodogram we notice that two distinct "jumps" are \textbf{not so sharp} as in TS3. That is an evidence of the fact that periodogram didn't "catch" natural frequencies, i.e. \textbf{frequencies are not of the form $\omega_n = \frac{(k - 1)}{n}$}.
+
+Calculations performed with TS3 are still valid for this case, although we would probably get less precise estimate and we probably want to round the frequencies to the nearest values: 
+```{r}
+n = length(ts4)
+ts4.freqs = round(Mod(fft(ts4))[1:(n/2+1)] * 2 / n, 6)
+ts4.freqs[ts4.freqs < 1] = 0     
+ts4.frecuencies = n / (-1 + which(ts4.freqs > 0))         # Find frequencies
+ts4.roundedfreq = round(n / (-1 + which(ts4.freqs > 0)))  # Round frequencies
+print(rbind(ts4.frecuencies, ts4.roundedfreq))
+ts4.freqs[ts4.freqs > 0]                                  # Find amplitudes
+```
+Thus we can guess that the process generated TS4 is $X^4_t = 1.2 cos \frac{2 \pi (t-1)}{83} + 3.6 cos \frac{2 \pi (t-1)}{12}$
+
+
+\newpage
+\subsection{Time Series 5}
+
+```{r, fig.height=6}
+descplot2(ts5, m=30)
+```
+TS5 appears to be generated by a \textbf{auto-regressive process} judging by the signature correlogram (evading saw-tooth-like), PACF (peak than almost-flat), periodogram (inverse bump) and $F(\omega)$. 
+
+Let us determine the optimal order of the model and then fit the coefficients based on the realization that we have. Along with $auto.arima$ tests that help to determine the order, we can use the sample ACF and PACF to do the same task. We know, that since AR has the following autocovariance $\sum_{j=0}^{p} \alpha_j R_{j-v}=\delta_v \sigma^2$, we can look for the value at which PACF becomes very close to 0. Our case the value is 2, meaning the AR order is $p=2$. 
+
+Besides, we also have learned that the resid variances of AR realizaiton should drop at the $lag=order$ which again yields $p=2$. 
+
+\newpage
+\begin{description} \item[(i) Optimal Order] \end{description}
+Let us demean the TS and use three different methods for determining the optimal order: 
+```{r}
+# library(forecast)         # Contains auto.arima function
+
+ts5.demeaned= ts5-mean(ts5) # Demean the Time Series
+auto.arima(x=ts5.demeaned,  # Demeaned Time Series 
+           d=0,             # Order of first-differencing
+           D=0,             # Order of differencing (for arIma)
+           max.p=5,         # Max AR order
+           max.q=5,         # MAX MA order
+           stationary=TRUE, # Restrict to only stationary models
+           seasonal=FALSE,  # Allow seasonal models
+           ic="aic")        # Akaike's Information Criteria
+```
+
+```{r}
+auto.arima(x=ts5.demeaned, d=0, D=0, stationary=T, seasonal=F,
+           ic="aicc")       # Corrected AIC
+```
+
+```{r}
+auto.arima(x=ts5.demeaned, d=0, D=0, stationary=T, seasonal=F, 
+           ic="bic")        # Bayesian Information Criteria
+```
+
+\newpage
+\begin{table}
+\centering
+\begin{tabular}{||c|c|c||}
+  \hline \hline
+  Method & AR order & MA order \\
+  \hline
+  PACF  & 2 & 0\\
+  AIC  & 2 & 0\\
+  AICC & 2 & 0 \\
+  BIC  & 2 & 0 \\
+  \hline 
+  Model & 2 & 0 \\
+  \hline \hline
+\end{tabular}
+\caption[Table caption text]{Comparison of the methods for determining optimal ARMA order}
+\end{table}
+
+
+\begin{description} \item[(i) Fitting the model] \end{description}  
+Let us now fir the model using maximum likelihood estimates using the optimal order based on AICC, which is the same as the true model's order:
+```{r}
+ts5.fit = arima(x=ts5.demeaned,    # Demeaned Time Series 
+                order=c(2, 0, 0),  # vector (p, d, q)
+                include.mean=F,    # whether or not include a mean in the fit
+                method = "CSS-ML") # CSS to find initial values, then ML
+summary(ts5.fit)
+```
+
+Thus we can estimate that the AR process generated TS5 is 
+$$X_{t} = 0.0345 X_{t-1} - 0.7593 X_{t-2} + \varepsilon_t$$
+
+
+
+\newpage
+\subsection{Time Series 6}
+
+```{r, fig.height=6}
+descplot2(ts6, m=30)
+```
+TS6 appears to be generated by a \textbf{moving average process} judging by the signature periodogram (bump-like), $F(\omega)$ (S-shaped) and ACF (no particular pattern). 
+
+Let us determine the optimal order of the model and then fit the coefficients based on the realization that we have. We know for MA process:
+
+$$R_v=\begin{cases} 
+		\sigma^2 \sum_{j=0}^{q-|v|} \beta_j \beta_{j+|v|} & |v|=1,..,q \\
+		0 & |v|=q+1,...
+		\end{cases}$$
+
+Which also says that PACF of the true MA is zero after the lag=q. On our realizaiton we see that after value $v=3$ PACF is very close to zero, thus we can guess $q=3$.
+
+\newpage
+\begin{description} \item[(i) Optimal Order] \end{description}
+Let us demean the TS and use three different methods for determining the optimal order: 
+```{r}
+ts6.demeaned= ts6-mean(ts6) # Demean the Time Series
+auto.arima(x=ts6.demeaned, d=0, D=0, stationary=T, seasonal=F, ic="aic")
+```
+
+```{r}
+auto.arima(x=ts6.demeaned, d=0, D=0, stationary=T, seasonal=F, ic="aicc")  
+```
+
+```{r}
+auto.arima(x=ts6.demeaned, d=0, D=0, stationary=T, seasonal=F, ic="bic")
+```
+
+\newpage
+\begin{table}
+\centering
+\begin{tabular}{||c|c|c||}
+  \hline \hline
+  Method & AR order & MA order \\
+  \hline
+  PACF & 0 & 3\\
+  AIC  & 2 & 4\\
+  AICC & 2 & 4 \\
+  BIC  & 0 & 3 \\
+  \hline 
+  Model & 0 & 3 \\
+  \hline \hline
+\end{tabular}
+\caption[Table caption text]{Comparison of the methods for determining optimal ARMA order}
+\end{table}
+
+\textbf{(i) Fitting the model.} Let's find coefficients based on the AICC's optimal order and the true order, which is estimated correctly by BIC:
+```{r}
+summary(arima(x=ts6.demeaned, order=c(2, 0, 4), include.mean=F, method = "CSS-ML")) # AICC
+
+summary(arima(x=ts6.demeaned,order=c(0,0,3),include.mean=F,method="CSS-ML")) # True order
+```
+
+Thus we can estimate that the MA process generated TS6 is 
+$$X_{t} = \varepsilon_t - 0.22\varepsilon_{t-1} - 0.51 \varepsilon_{t-2} -0.22 \varepsilon_{t-3}$$
+
+
+\newpage
+\subsection{Time Series 7}
+
+```{r, fig.height=6}
+descplot2(ts7, m=6)
+```
+TS6 appears to be generated by a \textbf{auto-regressive moving average process} judging by the signature $F(\omega)$ and ACF (evading saw-tooth-like). 
+
+Let us determine the optimal order of the model and then fit the coefficients based on the realization that we have. It's harder for the mix of the two models (AR and MA), but we know that for ARMA process: 
+$$R_v=\begin{cases} 	
+		\sum_{j=0}^{p} \alpha_j R_{j-v} = \sigma^2 \gamma^2_{-v} & v = 0,..,-q \\
+		\sum_{j=0}^{p} \alpha_j R_{j-v} = 0 & v = 1,2,...,q\\
+		0 & |v| = q+1,...
+		\end{cases}$$
+
+Since resid variances drop at 2 we conclude that AR order is $p=2$; since PACF is close to zero after lag of 4, I'd conclude that that MA order is $q=4$, which is slightly off.  
+
+\newpage
+\begin{description} \item[(i) Optimal Order] \end{description}
+Let us demean the TS and use three different methods for determining the optimal order: 
+```{r}
+ts7.demeaned= ts7-mean(ts7) # Demean the Time Series
+auto.arima(x=ts7.demeaned, d=0, D=0, stationary=T, seasonal=F,
+           ic="aic")       # Akaike's Information Criteria
+```
+
+```{r}
+auto.arima(x=ts7.demeaned, d=0, D=0, stationary=T, seasonal=F,
+           ic="aicc")       # Corrected AIC
+```
+
+```{r}
+auto.arima(x=ts7.demeaned, d=0, D=0, stationary=T, seasonal=F, 
+           ic="bic")        # Bayesian Information Criteria
+```
+
+\newpage
+\begin{table}
+\centering
+\begin{tabular}{||c|c|c||}
+  \hline \hline
+  Method & AR order & MA order \\
+  \hline
+  PACF & 2 & 4\\
+  AIC  & 3 & 4\\
+  AICC & 3 & 4 \\
+  BIC  & 1 & 1 \\
+  \hline 
+  Model & 2 & 3 \\
+  \hline \hline
+\end{tabular}
+\caption[Table caption text]{Comparison of the methods for determining optimal ARMA order}
+\end{table}
+
+textbf\{(i) Fitting the model} Let us now fit the model using maximum likelihood estimates based on AICC' optimal order and the true order:
+```{r}
+summary(arima(x=ts7.demeaned, order=c(3, 0, 4), include.mean=F, method = "CSS-ML")) # AICC
+
+summary(arima(x=ts7.demeaned,order=c(2,0,3),include.mean=F,method="CSS-ML")) # True order
+```
+
+Thus we can estimate that the ARMA process generated TS7 is 
+$$X_{t} = 0.02 X_{t-1} + 0.83 X_{t-2} + 
+\varepsilon_t - 0.26\varepsilon_{t-1} - 0.52 \varepsilon_{t-2} -0.21 \varepsilon_{t-3}$$
+
+
+
+
+\newpage
+\section{4. Predicting ARMA$(p, q)$ models}
+\subsection{1. Fit ARMA.} We are given the true orders of TS8: $p=1, q=2$. Let us fit all but last ten data points:
+```{r}
+ts8.demeaned = ts8 - mean(ts8)
+ts8.trunc = ts8.demeaned[1:(length(ts8.demeaned)-10)]
+ts8.fit = arima(x=ts8.trunc, order=c(1, 0, 2), include.mean=F, method = "CSS-ML")
+summary(ts8.fit)
+```
+Which estimate that the model looks as:
+$$X_{t} = -0.72 X_{t-1} + 
+\varepsilon_t +0.22\varepsilon_{t-1} - 0.64 \varepsilon_{t-2}$$
+
+\subsection{2. Predict future points.}
+Using $predict$ we now predict the last 10 data points and compute standard error of the prediction for each:
+```{r}
+ts8.pred = predict(ts8.fit, n.ahead=10)
+ts8.pred
+```
+
+\subsection{3. Plot TS and superimpose prediction.} Last 10 points (not used in fitting) are shown with dashed line.Predicted 10 values are shown as blue line. Red lines are the $\pm 1.645$ standard error confidence bounds: 
+```{r}
+# Plot TS
+plot(ts8, type="l", lty=2, xlab="t", ylab=expression(x[t]), 
+     main="TS8 + prediction + confidence bounds")
+lines(ts8.trunc, type="l")
+
+# Superimpose predicted values
+predicted = ts8.pred$pred + mean(ts8.trunc)
+lines(predicted, type="l", col="blue")
+
+# Superimpose +-1.645 Std Error
+std_1.645 = 1.645 * ts8.pred$se
+lines(predicted + std_1.645, type="l", col="red")
+lines(predicted - std_1.645, type="l", col="red")
+```
+
+\subsection{4. Prediction accuracy.} Nine out of ten realized data points are contained within the prediction intervals, as could be seen on the zoomed plot: 
+```{r, fig.height=5}
+# Plot TS
+interval = 230:250
+plot(interval, ts8[interval], type="o", lty=2, xlab="t", ylab=expression(x[t]),
+     ylim=c(min(ts8), max(ts8)), main="TS8 prediction and confidence (zoomed)")
+abline(v=240, lty=2)
+lines(ts8.trunc, type="l")
+
+# Superimpose predicted values
+predicted = ts8.pred$pred + mean(ts8.trunc)
+lines(predicted, type="o", col="blue")
+
+# Superimpose +-1.645 Std Error
+std_1.645 = 1.645 * ts8.pred$se
+lines(predicted + std_1.645, type="o", col="red")
+lines(predicted - std_1.645, type="o", col="red")
+
+# Legend
+legend('topleft', legend=c("Realization", "Predicted points",
+                           "Realized points", "Confidence bounds"),
+       lty=c(1,1,2,1), lwd=c(2.5,2.5,2.5,2.5),
+       col=c("Black", "Blue", "Black", "Red"))
+```
+
+
